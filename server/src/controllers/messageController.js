@@ -20,14 +20,15 @@ async function fetchRoomMessages(req, res) {
 
   const messages = await Message.find({ roomId })
     .populate('senderId', 'username')
-    .sort({ createdAt: 1 })
+    .sort({ createdAt: -1 }) // latest first
     .limit(200);
-  // Backfill senderUsername for any old messages without it
-  const hydrated = messages.map((m) => ({
+  // Backfill senderUsername for any old messages without it, then reverse to chronological order in client
+  const hydratedLatestFirst = messages.map((m) => ({
     ...m.toObject(),
     senderUsername: m.senderUsername && m.senderUsername.length > 0 ? m.senderUsername : (m.senderId?.username || 'User'),
   }));
-  return res.json(hydrated);
+  // Return latest-first so client can decide order; alternatively reverse here:
+  return res.json(hydratedLatestFirst.reverse());
 }
 
 async function postMessage(req, res) {

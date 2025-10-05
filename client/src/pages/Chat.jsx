@@ -21,6 +21,9 @@ export default function Chat({ user }) {
   const [joinRoomName, setJoinRoomName] = useState('');
   const [joinRoomPassword, setJoinRoomPassword] = useState('');
   const [joinModalError, setJoinModalError] = useState('');
+  const messagesContainerRef = useRef(null);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const autoScrollRef = useRef(true);
 
   useEffect(() => {
     async function loadRooms() {
@@ -59,6 +62,34 @@ export default function Chat({ user }) {
       socket.disconnect();
     };
   }, [user]);
+
+  // Track whether user is at bottom to enable/disable auto-scroll
+  useEffect(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+      autoScrollRef.current = atBottom;
+      setAutoScroll(atBottom);
+    };
+    el.addEventListener('scroll', onScroll);
+    // Initialize state based on starting position
+    onScroll();
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
+  function scrollToBottom(smooth) {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  }
+
+  // When messages change, auto-scroll if the user is at bottom
+  useEffect(() => {
+    if (autoScrollRef.current) {
+      requestAnimationFrame(() => scrollToBottom(true));
+    }
+  }, [messages]);
 
   useEffect(() => {
     async function checkRoom() {
@@ -114,6 +145,12 @@ export default function Chat({ user }) {
         });
         setMessages(res.data);
         setJoinError('');
+        // After initial load, jump to the latest (bottom)
+        setTimeout(() => {
+          scrollToBottom(false);
+          autoScrollRef.current = true;
+          setAutoScroll(true);
+        }, 0);
       } catch (e) {
         setJoinError(e.response?.data?.error || 'Unable to load messages');
         setAuthorized(false);
@@ -334,7 +371,7 @@ export default function Chat({ user }) {
         </div>
       )}
 
-      <div className="chat-messages">
+      <div className="chat-messages" ref={messagesContainerRef}>
         {!authorized && (
           <div className="messages-container">
             <div className="alert alert-error" style={{ marginBottom: 16 }}>
